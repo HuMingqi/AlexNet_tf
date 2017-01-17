@@ -1,8 +1,11 @@
 '''
 Author: hiocde
+Email: hiocde@gmail.com
 Date: 1.16.17
-Special: I found the fourth reading data method! not placeholder,pipeline and constant
+original/new: I found the fourth reading data method! not placeholder,pipeline and constant
 described by official docs, I used API tf.pack!
+For another, I used completely tf ops for image not using opencv.
+Domain: main_dir{sub_dir{same class raw images}...}
 '''
 
 import os

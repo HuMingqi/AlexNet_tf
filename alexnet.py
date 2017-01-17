@@ -7,7 +7,6 @@ Domain:
 '''
 
 import tensorflow as tf
-from . import input
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -24,12 +23,11 @@ NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 6412
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
 NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
-INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
+INITIAL_LEARNING_RATE = 1e-4       # Initial learning rate.
 
 
 def print_activations(t):
     print(t.op.name, ' ', t.get_shape().as_list())
-
 
 def inference(images):
     """
@@ -97,6 +95,7 @@ def inference(images):
         biases = tf.Variable(tf.constant(0.0, shape=[384], dtype=tf.float32),
                              trainable=True, name='biases')
         bias = tf.nn.bias_add(conv, biases)
+        #** assign to use scope not scope.name , because it's not tf.variable_scope 
         conv3 = tf.nn.relu(bias, name=scope)
         print_activations(conv3)
 
@@ -142,7 +141,7 @@ def inference(images):
             'weights', shape=[columns, 4096], stddev=0.04, wd=0.004)
         biases = _variable_on_cpu(
             'biases', [4096], tf.constant_initializer(0.1))
-        fc1 = tf.nn.relu(tf.matmul(plane, weights) + biases, name=scope)
+        fc1 = tf.nn.relu(tf.matmul(plane, weights) + biases, name=scope.name)
 
     # fc2
     with tf.variable_scope('fc2') as scope:
@@ -150,18 +149,17 @@ def inference(images):
             'weights', shape=[4096, 4096], stddev=0.04, wd=0.004)
         biases = _variable_on_cpu(
             'biases', [4096], tf.constant_initializer(0.1))
-        fc2 = tf.nn.relu(tf.matmul(fc1, weights) + biases, name=scope)
+        fc2 = tf.nn.relu(tf.matmul(fc1, weights) + biases, name=scope.name)
 
     # softmax-linear, not normalize at once
     with tf.variable_scope('softmax_linear') as scope:
         weights = _variable_with_weight_decay(
             'weights', shape=[4096, NUM_CLASSES], stddev=0.04, wd=0.004)
         biases = _variable_on_cpu(
-            'biases', [4096], tf.constant_initializer(0.1))
-        softmax_linear = tf.add(tf.matmul(fc2, weights), biases, name=scope)
+            'biases', [NUM_CLASSES], tf.constant_initializer(0.1))
+        softmax_linear = tf.add(tf.matmul(fc2, weights), biases, name=scope.name)
 
     return softmax_linear
-
 
 def regular_loss(logits, labels):
     """
@@ -183,7 +181,6 @@ def regular_loss(logits, labels):
     # The total loss is defined as the cross entropy loss plus all of the
     # weight decay terms (L2 loss).
     return tf.add_n(tf.get_collection('losses'), name='regular_loss')
-
 
 def step_train(total_loss, global_step):
     """
@@ -239,6 +236,7 @@ def step_train(total_loss, global_step):
         train_op = tf.no_op(name='train')
 
     return train_op
+
 
 def _add_loss_summaries(total_loss):
     """Add summaries for losses in AlexNet model.

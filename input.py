@@ -2,8 +2,8 @@
 Author: hiocde
 Email: hiocde@gmail.com
 Date: 1.16.17
-original/new: I found the fourth reading data method! not placeholder,pipeline and constant
-described by official docs, I used API tf.pack!
+original/new: I found the fourth reading data method! not placeholder,quque-pipeline and constant
+described by official docs, I used API tf.pack to build myself auto input pipeline!
 For another, I used completely tf ops for image not using opencv.
 Domain: main_dir{sub_dir{same class raw images}...}
 '''
@@ -86,4 +86,4 @@ class ImageSet:
 # #print:
 # # Tensor("pack_32:0", shape=(32, 227, 227, 3), dtype=float32)
 # # Tensor("pack_33:0", shape=(32,), dtype=int32)
-# #good job!
+# #good job! A auto input pipeline

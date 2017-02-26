@@ -14,13 +14,14 @@ import tensorflow as tf
 
 class ImageSet:
 
-	def __init__(self, img_main_dir):
+	def __init__(self, img_main_dir, generalized=True):
 		self.examples= self.create_examples(img_main_dir)
 		np.random.shuffle(self.examples)
 		self.num_exps= len(self.examples)
 		self.pointer= 0 	#pointer points next example
 		self.images, self.labels= zip(*self.examples)
 		self.num_class= len(set(self.labels))
+		self.generalized= generalized	#generalize source images?
 
 	def has_next_exp(self):
 		return self.pointer< self.num_exps
@@ -55,7 +56,7 @@ class ImageSet:
 		'''
 		examples=[]
 		for sub_dir in os.listdir(img_main_dir):
-			class_index= int(sub_dir[-1]) 	#because I appended class index to sub_dir
+			class_index= int(sub_dir.split('_')[-1]) 	#because I appended class index to sub_dir
 			for img_name in os.listdir(os.path.join(img_main_dir, sub_dir)):
 				examples.append((os.path.join(img_main_dir,sub_dir,img_name), class_index))
 		return examples
@@ -66,6 +67,7 @@ class ImageSet:
 		   Return:
 		   	a 3d-tensor of img, dtype=uint8
 		'''
+		print(img_path)
 		return tf.image.decode_jpeg(tf.read_file(img_path),3)
 
 	def distort_image(self, img):
@@ -73,12 +75,13 @@ class ImageSet:
 		distorted_image = tf.cast(img, tf.float32)
 		#It's fun that 224*224 input size in Alex's paper, but in fact is 227*227.( (224 - 11)/4 + 1 is quite clearly not an integer)
 		distorted_image = tf.image.resize_images(distorted_image, [227, 227]) 	
-		distorted_image = tf.image.random_flip_left_right(distorted_image)
-		distorted_image = tf.image.random_brightness(distorted_image,max_delta=63)
-		distorted_image = tf.image.random_contrast(distorted_image,lower=0.2,upper=1.8)
+		if self.generalized:
+			distorted_image = tf.image.random_flip_left_right(distorted_image)
+			distorted_image = tf.image.random_brightness(distorted_image,max_delta=63)
+			distorted_image = tf.image.random_contrast(distorted_image,lower=0.2,upper=1.8)
 		return tf.image.per_image_standardization(distorted_image)
 
-###test
+### Test
 # trainset= ImageSet('/mnt/g/machine_learning/dataset/Alexnet_tf/paris')
 # x,y=trainset.next_batch(32)
 # print(x)

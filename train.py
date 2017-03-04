@@ -1,7 +1,8 @@
 '''
 Author: hiocde
 Email: hiocde@gmail.com
-Date: 1.17.17
+Start: 1.17.17
+Completion: 
 Original/New: 
 Domain: 
 '''
@@ -25,24 +26,23 @@ tf.app.flags.DEFINE_string('log_dir', 'G:/machine_learning/models/Alexnet_tf/log
                            """Directory where to write event logs """
                            """and checkpoint.""")
 
-# Constants describing the training process.
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 6412
+# A epoch is one cycle which train the whole training set.
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 #NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 12*50
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
 NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 1e-5      # Initial learning rate, my experience to set it more litter if occurs NAN(Gradient Exploding).
 
-trainset = input.ImageSet(FLAGS.train_data)
-
 
 def train():
     """Train AlexNet for a number of steps."""
+    trainset = input.ImageSet(FLAGS.train_data)
     with tf.Graph().as_default():
         global_step = tf.Variable(0, trainable=False)
-        images, labels = trainset.next_batch(FLAGS.batch_size)	# Dont need like alexnet.FLAGS.batch_size
+        images, labels, _ = trainset.next_batch(FLAGS.batch_size)	# Dont need like alexnet.FLAGS.batch_size
 
-        #*** you dont need feed every step, I built the input pipeline(subgraph) for inference
+        #*** Don't need feed each step, I built the input pipeline(subgraph) for inference
         logits = alexnet.inference(images)
         loss = regular_loss(logits, labels)
         train_op = step_train(loss, global_step)
@@ -51,7 +51,8 @@ def train():
         saver = tf.train.Saver(tf.all_variables())
 
         # Build the summary operation based on the TF collection of Summaries.
-        summary_op = tf.merge_all_summaries()
+        # In TF1.0 , tf.merge_all_summaries renamed tf.summary.merge_all
+        summary_op = tf.summary.merge_all()
 
         # Build an initialization operation to run below.
         init = tf.global_variables_initializer()
@@ -60,19 +61,21 @@ def train():
         sess = tf.Session()
         sess.run(init)
 
-        summary_writer = tf.train.SummaryWriter(FLAGS.log_dir, sess.graph)
+        # ***Start the queue runners. So why need manual start??? foolish!
+        tf.train.start_queue_runners(sess=sess)
+
+        # In TF1.0 , tf.train.SummaryWriter was deprecated, use tf.summary.FileWriter instead.
+        summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
         for step in xrange(FLAGS.max_steps):
+            #print('enter')
             start_time = time.time()
-            _, _loss, model_loss = sess.run([train_op, loss, tf.get_default_graph().get_tensor_by_name("cross_entropy_mean:0")])
+            _, total_loss, model_loss = sess.run([train_op, loss, tf.get_default_graph().get_tensor_by_name("cross_entropy_mean:0")])            
             duration = time.time() - start_time
 
-            print(step)
-            print(_loss)
-            print(model_loss)
-            print()
-            #print(_labels)
-            assert not np.isnan(_loss), 'Model diverged with loss = NaN'
+            print('%d, %.2f, %.2f'% (step, total_loss, model_loss))            
+            
+            assert not np.isnan(total_loss), 'Model diverged with loss = NaN'
 
             if step % 10 == 0:
                 examples_per_sec = FLAGS.batch_size / duration
@@ -80,7 +83,7 @@ def train():
 
                 format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch)')
-                print(format_str % (datetime.now(), step, _loss,
+                print(format_str % (datetime.now(), step, total_loss,
                                     examples_per_sec, sec_per_batch))
 
             if step % 100 == 0:
@@ -103,8 +106,10 @@ def regular_loss(logits, labels):
     """
     # Calculate the average cross entropy loss across the batch.
     labels = tf.cast(labels, tf.int64)
+    # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+    #     logits, labels, name='cross_entropy_per_example')		# Not work in TF1.0
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits, labels, name='cross_entropy_per_example')
+        logits=logits, labels=labels, name='cross_entropy_per_example')
     cross_entropy_mean = tf.reduce_mean(
         cross_entropy, name='cross_entropy_mean')
     tf.add_to_collection('losses', cross_entropy_mean)
@@ -117,8 +122,12 @@ def step_train(total_loss, global_step):
     """
     One step train AlexNet model.
 
-    Create an optimizer and apply to all trainable variables. Add moving
-    average for all trainable variables.
+    Create an optimizer and apply to all trainable variables. 
+    
+    ***
+    Add moving average for all trainable variables, 
+    use averaged parameters sometimes produce significantly better results than the final trained values.
+    ***
 
     Args:
       total_loss: Total loss from regular_loss().
@@ -137,7 +146,8 @@ def step_train(total_loss, global_step):
                                     decay_steps,
                                     LEARNING_RATE_DECAY_FACTOR,
                                     staircase=True)
-    tf.scalar_summary('learning_rate', lr)
+    # In TF1.0, scalar_summary has been renamed to summary.scalar
+    tf.summary.scalar('learning_rate', lr)
 
     # Generate moving averages of all losses and associated summaries.
     loss_averages_op = _add_loss_summaries(total_loss)
@@ -151,13 +161,14 @@ def step_train(total_loss, global_step):
     apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
     # Add histograms for trainable variables.
+    # In TF1.0 , tf.scalar_summary and tf.histogram_summary. Use tf.summary.scalar and tf.summary.histogram instead.
     for var in tf.trainable_variables():
-        tf.histogram_summary(var.op.name, var)
+        tf.summary.histogram(var.op.name, var)
 
     # Add histograms for gradients.
     for grad, var in grads:
         if grad is not None:
-            tf.histogram_summary(var.op.name + '/gradients', grad)
+            tf.summary.histogram(var.op.name + '/gradients', grad)
 
     # Track the moving averages of all trainable variables.
     variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
@@ -189,8 +200,8 @@ def _add_loss_summaries(total_loss):
     for l in losses + [total_loss]:
         # Name each loss as '(raw)' and name the moving average version of the
         # loss as the original loss name.
-        tf.scalar_summary(l.op.name + ' (raw)', l)
-        tf.scalar_summary(l.op.name, loss_averages.average(l))
+        tf.summary.scalar(l.op.name + ' (raw)', l)
+        tf.summary.scalar(l.op.name, loss_averages.average(l))
 
     return loss_averages_op
 
@@ -201,6 +212,5 @@ def main(argv=None):  # pylint: disable=unused-argument
     tf.gfile.MakeDirs(FLAGS.log_dir)
     train()
 
-
 if __name__ == '__main__':
-    tf.app.run()	# <=> FLAGS(sys.argv); main()
+    tf.app.run()	# <=> parse argv and call main. //XuanXue

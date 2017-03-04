@@ -1,16 +1,16 @@
 '''
 Author: hiocde
 Email: hiocde@gmail.com
-Date: 1.17.17
-Original/New:
-Domain:
+Start: 1.17.17
+Original:  
+Domain: 
 '''
 
 import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 # model cmd parameter, input standard.
-tf.app.flags.DEFINE_integer('batch_size', 64,
+tf.app.flags.DEFINE_integer('batch_size', 8,
                             """Number of images to process in a batch.""")
 # model output standard.
 NUM_CLASSES = 12
@@ -21,9 +21,9 @@ def inference(images):
     Brief:
           Build the AlexNet model.
     Args:
-      images: Images, 4D Tensor from input
+      images: Images, 4D Tensor from input, shape: [batch_size, height, width, channels]
     Returns:
-      Logits, 2D tensor
+      Logits, 2D tensor, shape: [batch_size, num_classes]
     """
     # conv1
     with tf.name_scope('conv1') as scope:
@@ -129,6 +129,7 @@ def inference(images):
         biases = _variable_on_cpu(
             'biases', [4096], tf.constant_initializer(0.1))
         fc1 = tf.nn.relu(tf.matmul(plane, weights) + biases, name=scope.name)
+        print_activations(fc1)
 
     # fc2
     with tf.variable_scope('fc2') as scope:
@@ -137,15 +138,18 @@ def inference(images):
         biases = _variable_on_cpu(
             'biases', [4096], tf.constant_initializer(0.1))
         fc2 = tf.nn.relu(tf.matmul(fc1, weights) + biases, name=scope.name)
+        print_activations(fc2)
 
-    # softmax-linear, not normalize at once
+    # softmax-linear
+    # ***not normalize at once for using API sparse_softmax_cross_entropy_with_logits
+    # (It's said by official that it performs a softmax on logits internally for efficiency)***
     with tf.variable_scope('softmax_linear') as scope:
         weights = _variable_with_weight_decay(
             'weights', shape=[4096, NUM_CLASSES], stddev=0.04, wd=0.004)
         biases = _variable_on_cpu(
             'biases', [NUM_CLASSES], tf.constant_initializer(0.0))
         softmax_linear = tf.add(tf.matmul(fc2, weights), biases, name=scope.name)
-
+        print_activations(softmax_linear)
     return softmax_linear
 
 
@@ -189,6 +193,7 @@ def _variable_with_weight_decay(name, shape, stddev, wd):
         shape,
         tf.truncated_normal_initializer(stddev=stddev, dtype=tf.float32))
     if wd is not None:
-        weight_decay = tf.mul(tf.nn.l2_loss(var), wd, name='weight_decay')
+    	# Note: In TF 1.0 , tf.mul() function has been renamed to tf.multiply()
+        weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_decay')
         tf.add_to_collection('losses', weight_decay)
     return var

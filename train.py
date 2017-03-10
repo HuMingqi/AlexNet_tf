@@ -3,7 +3,7 @@ Author: hiocde
 Email: hiocde@gmail.com
 Start: 1.17.17
 Completion: 
-Original/New: 
+Original: Train model and add summary for visualization.
 Domain: 
 '''
 
@@ -180,7 +180,8 @@ def step_train(total_loss, global_step):
     return train_op
 
 def _add_loss_summaries(total_loss):
-    """Add summaries for losses in AlexNet model.
+    """
+    Add summaries for losses in AlexNet model.
 
     Generates moving average for all losses and associated summaries for
     visualizing the performance of the network.

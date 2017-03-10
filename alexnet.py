@@ -2,15 +2,16 @@
 Author: hiocde
 Email: hiocde@gmail.com
 Start: 1.17.17
-Original:  
-Domain: 
+Completion: 
+Original:  AlexNet implement with TensorFlow.
+Domain: DL, DNN.
 '''
 
 import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 # model cmd parameter, input standard.
-tf.app.flags.DEFINE_integer('batch_size', 8,
+tf.app.flags.DEFINE_integer('batch_size', 64,
                             """Number of images to process in a batch.""")
 # model output standard.
 NUM_CLASSES = 12

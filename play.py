@@ -19,7 +19,7 @@ tf.app.flags.DEFINE_string('input', 'G:/machine_learning/dataset/Alexnet_tf/pari
                             """Data input directory when using a product level model(trained and tested).""")
 tf.app.flags.DEFINE_string('checkpoint_dir', 'G:/machine_learning/models/Alexnet_tf/log',
 							"""Model checkpoint dir path.""")
-tf.app.flags.DEFINE_string('output', 'G:/machine_learning/models/Alexnet_tf/output', 
+tf.app.flags.DEFINE_string('output', 'G:/machine_learning/models/Alexnet_tf/output',
 							'''Model output dir, stores image features''')
 MOVING_AVERAGE_DECAY = 0.9999     # equals the value used in training.
 
@@ -36,7 +36,12 @@ def build_feature_lib():
 		# Use our model
 		fc1= g.get_tensor_by_name("fc1/fc1:0")	#*** use full name: variable_scope name + var/op name + output index
 		fc2= g.get_tensor_by_name("fc2/fc2:0")
-		softmax= tf.nn.softmax(logits)	#softmax = exp(logits) / reduce_sum(exp(logits), dim), dim=-1 means add along line.
+		# softmax= tf.nn.softmax(logits)	#softmax = exp(logits) / reduce_sum(exp(logits), dim), dim=-1 means add along line.
+		# use l2 normalization
+			#*** see l2_normalize source code, you will understand why 1 not 0
+		fc1_norm=tf.nn.l2_normalize(fc1,1)
+		fc2_norm=tf.nn.l2_normalize(fc2,1)
+		fc3_norm=tf.nn.l2_normalize(logits,1)
 
 		# Run our model
 		steps= math.ceil(imageset.num_exps/FLAGS.batch_size) #*** Maybe exist some duplicate image features, next dict op will clear it.
@@ -66,14 +71,14 @@ def build_feature_lib():
 	  			#*** Don't move the dir of checkpoint when training ended if use following statement!
 	  			saver.restore(sess, ckpt.model_checkpoint_path)	  			
       		
-			# fc1_list=fc2_list=softmax_list=[] # the same object!
-			fc1_list=[]; fc2_list=[]; softmax_list=[]
+			# fc1_list=fc2_list=fc3_list=[] # the same object!
+			fc1_list=[]; fc2_list=[]; fc3_list=[]
 			id_list=[]
 			for step in range(steps):			
-				_ids, _fc1, _fc2, _softmax= sess.run([ids,fc1,fc2,softmax])	#return nd-array
+				_ids, _fc1, _fc2, _fc3= sess.run([ids,fc1_norm,fc2_norm,fc3_norm])	#return nd-array
 				put_2darray(_fc1, fc1_list)
 				put_2darray(_fc2, fc2_list)
-				put_2darray(_softmax, softmax_list)				
+				put_2darray(_fc3, fc3_list)				
 				# if step == steps-1:
 				# 	with open('G:/tmp/duplicate.txt','w') as f:
 				# 		f.write(str(_ids.tolist()))
@@ -84,7 +89,7 @@ def build_feature_lib():
 				if step%10 == 0 or step == steps-1:
 					save(id_list, fc1_list, FLAGS.output+'/fc1_features.json')
 					save(id_list, fc2_list, FLAGS.output+'/fc2_features.json')
-					save(id_list, softmax_list, FLAGS.output+'/softmax_features.json')
+					save(id_list, fc3_list, FLAGS.output+'/fc3_features.json')
 					print('Step %d, %.3f%% extracted.'%(step, (step+1)/steps*100))
 			
 			coord.request_stop()

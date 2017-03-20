@@ -17,8 +17,8 @@ Reference
 4. TensorFlow Cifar10 example: https://www.tensorflow.org/versions/master/tutorials/deep_cnn/
 5. VGG Paris Dataset: http://www.robots.ox.ac.uk/~vgg/data/parisbuildings/
 6. Good documents to understand Convolution:
- * https://deeplearning4j.org/convolutionalnets
- * https://cs231n.github.io/convolutional-networks/
+   * https://deeplearning4j.org/convolutionalnets
+   * https://cs231n.github.io/convolutional-networks/
 
 Contact
 -------
